@@ -6,6 +6,7 @@ import { HexString } from "web3";
 import { Web3Context } from '../App';
 import {getEstimateAddress, fetchBalance} from '../components/estimateAddress'
 import Transfer from "../components/Transfer";
+import TransactionHistory from "../components/TransactionHistory";
 
 function User() {
     const web3 = useContext(Web3Context);

@@ -6,9 +6,10 @@ import {tokens} from '../token/tokens';
 import {
     chainIdandType,
     chainInfo,
-    ENTRYPOINT_ADDRESS,
+    SALT,
+    ENTRYPOINT,
     PAYMASTER_ADDRESS,
-    VERIFIERADDRESS,
+    SECP256R1_VERIFIER,
 } from './chainInfo';
 
 import {fetchERC20Balance} from './estimateAddress';
@@ -16,7 +17,7 @@ import signUserOperation from './signTx';
 
 import Entrypoint from '../abi/entrypoint.json';
 import TransactionAbi from '../abi/TransactionAbi.json'
-import FactoryContract from '../abi/FactoryContract.json'
+import LouiceFactory from '../abi/LouiceFactory.json'
 
 type TokenKey = keyof typeof tokens;
 
@@ -51,8 +52,8 @@ async function getChainDetails(web3: Web3) {
   
     return {
       userOpProvider,
-      FACTORY_ADDRESS: chainInfo[chainType].FACTORY_ADDRESS,
-      entryContract: new web3.eth.Contract(Entrypoint.abi as any, ENTRYPOINT_ADDRESS),
+      LOUICE_FACTORY: chainInfo[chainType].LOUICE_FACTORY,
+      entryContract: new web3.eth.Contract(Entrypoint.abi as any, ENTRYPOINT),
     };
 }
   
@@ -92,7 +93,7 @@ const estimateUserOperationGas = async (web3:any, userOp:any) => {
     const estimateGas = await web3.currentProvider.sendAsync({
         jsonrpc: "2.0",
         method: "eth_estimateUserOperationGas",
-        params: [userOp, ENTRYPOINT_ADDRESS],
+        params: [userOp, ENTRYPOINT],
         id: new Date().getTime()
     });
     return estimateGas;
@@ -104,7 +105,7 @@ const sendUserOperation = async (web3:any, userOp:any) => {
     const opHash = await web3.currentProvider.sendAsync({
         jsonrpc: "2.0",
         method: "eth_sendUserOperation",
-        params: [userOp, ENTRYPOINT_ADDRESS],
+        params: [userOp, ENTRYPOINT],
         id: new Date().getTime()
     });
     return opHash;
@@ -188,16 +189,14 @@ async function getSponserFromPaymaster(userOp:any, ERC20_contract:HexString) {
 
 const createTx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeType:TokenKey) => {
     console.log('createTx function calling...');
-    const {userOpProvider, FACTORY_ADDRESS, entryContract} = await getChainDetails(web3);
+    const {userOpProvider, LOUICE_FACTORY, entryContract} = await getChainDetails(web3);
     try {
-        const encodedKeys = web3.eth.abi.encodeParameters(
-            ['uint256', 'uint256', 'string'],
-            [publicKeys[0], publicKeys[1], rawId]
-          );
+        const prefix = "0x04";
+        const publicKey = prefix +publicKeys[0].slice(2) + publicKeys[1].slice(2);
 
-        const encodedFunctionCall = web3.eth.abi.encodeFunctionCall(TransactionAbi.createWalletABI, [ENTRYPOINT_ADDRESS, VERIFIERADDRESS ,encodedKeys, rawId]);
+        const encodedFunctionCall = web3.eth.abi.encodeFunctionCall(TransactionAbi.createAccountABI, [SECP256R1_VERIFIER ,publicKey, SALT]);
 
-        var initCode = FACTORY_ADDRESS + encodedFunctionCall.slice(2);
+        var initCode = LOUICE_FACTORY + encodedFunctionCall.slice(2);
         console.log({initCode});
         const sender = await getSenderAddress(entryContract, initCode);
         console.log({ sender });

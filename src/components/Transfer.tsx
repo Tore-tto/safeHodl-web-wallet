@@ -7,10 +7,12 @@ type TokenKey = keyof typeof tokens;
 
 import {fetchBalance, fetchERC20Balance} from './estimateAddress'
 import {contractETHTx, contractERC20Tx, getUserOperationByHash} from './txCreation'
+import {getAllTransactions, saveTransaction, clearTransactions} from './database/indexDb'
 
 import Loading from './popups/Loading';
 import TransactionPopup from './popups/TransactionPopup';
 import ErrorPopup from './popups/ErrorPupUp';
+import TransactionHistory from './TransactionHistory';
 
 function Transfer(props: {  address: HexString, rawId: any, publicKeys:any[] }) {
     const web3:any = useContext(Web3Context);
@@ -29,9 +31,22 @@ function Transfer(props: {  address: HexString, rawId: any, publicKeys:any[] }) 
     const [txHash, setTxHash] = useState<HexString>('');
     const [errorMessage, setErrorMessage] = useState<String>('');
 
+    const [transactions, setTransactions] = useState([] as any);
+    const [newTransaction, setNewTransaction] = useState({ hash: '', amount: '', type:''});
+
+
     const [loading, setLoading] = useState<boolean>(false); 
     const [showPopup, setShowPopup] = useState<boolean>(false);
     const [showErrorPopup, setShowErrorPopup] = useState(false);
+
+    useEffect(() => {
+        const fetchTransactions = async () => {
+          const allTransactions = await getAllTransactions(props.rawId);
+          console.log({allTransactions});
+          setTransactions(allTransactions);
+        };
+        fetchTransactions();
+      }, []);
 
     // Monitor txStatus and show popup when it gets data
     useEffect(() => {
@@ -42,6 +57,22 @@ function Transfer(props: {  address: HexString, rawId: any, publicKeys:any[] }) 
             setShowErrorPopup(true);
         }
     }, [txStatus, errorMessage]);
+
+    const handleAddTransaction = async(status:String, result:any) =>{
+        // console.log({status},{result});
+        const transaction = {
+            hash:result.transaction,
+            from:result.userOp.sender,
+            to: toAddress,
+            amount: amount,
+            type: chain, // E.g., "deposit", "withdrawal"
+            status:status
+        };
+        console.log("db transaction",transaction);
+        saveTransaction(props.rawId,transaction).then(()=>{
+            setTransactions([...transactions, transaction]); // Update state
+        })
+    }
 
     const handleClosePopup = () => {
         setShowPopup(false);
@@ -187,6 +218,7 @@ function Transfer(props: {  address: HexString, rawId: any, publicKeys:any[] }) 
                         } else {
                             console.log('Transaction completed successfully.');
                         }
+                        await handleAddTransaction(result.status, result);
                         break;
                     }
                 }
@@ -276,6 +308,11 @@ function Transfer(props: {  address: HexString, rawId: any, publicKeys:any[] }) 
                 />
                 </div>
             )}
+
+            <>
+                <h2> Transaction History</h2>
+                <TransactionHistory transactions={transactions}></TransactionHistory>
+            </>
         </>
     );
 }    

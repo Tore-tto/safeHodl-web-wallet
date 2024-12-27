@@ -1,22 +1,22 @@
 import { ethers, BigNumber } from "ethers";
-import FactoryContract from "../abi/FactoryContract.json";
+import LouiceFactory from "../abi/LouiceFactory.json";
 import { HexString } from "web3";
 
 import {tokens} from '../token/tokens';
+import {SECP256R1_VERIFIER, SALT} from "./chainInfo"
 type TokenKey = keyof typeof tokens;
 
 export const getEstimateAddress = async (web3:any, rawId: any, publicKeys:any[]): Promise<any> => {
-    const factoryContractIn = new web3.eth.Contract(FactoryContract.abi, "0x6edC2BBB344225A86a7940C02FFad62a0776737E");
+    const LOUICE_FACTORY = "0x795b7F055dE5b1652E88EE0A6b84eabA09E7Eff5";
+    const LouiceFactoryIn = new web3.eth.Contract(LouiceFactory.abi, LOUICE_FACTORY);
     
-    const encodedKeys = ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "uint256", "string"],
-        [publicKeys[0], publicKeys[1], rawId]
-    );
-
-    const address = factoryContractIn.methods.getAddress(
-        "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-        "0xa03603F1966d8AAE2b4528bC7946510F6EB79A22",
-        encodedKeys).call();
+    const prefix = "0x04";
+    const publicKey = prefix +publicKeys[0].slice(2) + publicKeys[1].slice(2);
+    
+    const address = LouiceFactoryIn.methods.getAddress(
+      SECP256R1_VERIFIER,
+      publicKey,
+      SALT).call();
 
     return address;
 }

@@ -15,14 +15,20 @@ function TransactionHistory(props: { transactions: any }) {
             <li style={listItem} key={transaction.hash}>
               {/* Click handler moved to the <p> */}
               <p
-                style={amount}
+                style={{
+                  ...amount,
+                  color: transaction.status === "OnChain" ? "darkgreen" : "red",
+                }}
                 onClick={() => toggleExpand(transaction.hash)}
               >
                 <strong>{transaction.amount}</strong> ({transaction.type}) on {transaction.status}
               </p>
 
               {expandedId === transaction.hash && (
-                <div style={expanded}>
+                <div style={{
+                  ...expanded,
+                  backgroundColor: transaction.status === "OnChain" ? "lightgreen" : "#fc9781",
+                }}>
                   <p>
                     <strong>Hash:</strong>
                     <a

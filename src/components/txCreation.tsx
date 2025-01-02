@@ -182,8 +182,8 @@ async function getSponserFromPaymaster(userOp:any, ERC20_contract:HexString) {
         headers: { 'Content-Type': 'application/json' }
       });
     
-      console.log("paymasterSignedData: ",response.data.result);
-      return response.data.result;
+      console.log("paymasterSignedData: ", response.data);
+      return response.data;
 }
 
 
@@ -270,13 +270,16 @@ const createTx = async (web3:any, walletAddress:HexString, rawId:string, publicK
             console.log("Transaction actualTokenCost :", requiredBalance);
             const balance =  await fetchERC20Balance(web3, walletAddress, feeType);
             if(requiredBalance > balance)
-                return { error: true, message: `Insufficient balance. need ${requiredBalance} ${feeType} available ${balance} ${feeType}`};
+            return { error: true, message: `Insufficient balance. need ${requiredBalance} ${feeType} available ${balance} ${feeType}`};
 
             const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
             userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
             
             const paymasterData = await getSponserFromPaymaster(userOp, executeParams[3]);
-            userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData;
+            if(paymasterData.error)
+                return { error: true, message: `${paymasterData.error?.message}. need ${requiredBalance} ${feeType} available ${balance} ${feeType}` || "Failed to get paymasterData."  };
+
+            userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;
         }
 
         const userOpHash = await entryContract.methods.getUserOpHash(userOp).call();

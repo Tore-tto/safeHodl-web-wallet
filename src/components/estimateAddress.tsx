@@ -7,7 +7,7 @@ import {SECP256R1_VERIFIER, SALT} from "./chainInfo"
 type TokenKey = keyof typeof tokens;
 
 export const getEstimateAddress = async (web3:any, rawId: any, publicKeys:any[]): Promise<any> => {
-    const LOUICE_FACTORY = "0x795b7F055dE5b1652E88EE0A6b84eabA09E7Eff5";
+    const LOUICE_FACTORY = "0x0cA86987e13568500BCC4238a9d6F8988BAF6A86";
     const LouiceFactoryIn = new web3.eth.Contract(LouiceFactory.abi, LOUICE_FACTORY);
     
     const prefix = "0x04";

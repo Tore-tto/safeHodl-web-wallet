@@ -1,29 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { useLocation, useParams } from 'react-router-dom';
+import React, { useState } from "react";
+import { useLocation } from 'react-router-dom';
 import setting from '../assets/setting.png';
 import notification from '../assets/notification.png';
 import home from '../assets/home.png';
 import discover from '../assets/discover.png';
 import bitcoinLogo from '../assets/bitcoin-logo.png';
-import downArrow from '../assets/downarrow.png';
-import upArrow from '../assets/uparrow.png';
+
+import  Transfer from "../components/Transfer";
+
 function User() {
     const [isTransfer, setIsTransfer] = useState<Boolean>(false);
-    const [isSend, setIsSend] = useState<Boolean>(false);
-    const [isReceive, setIsReceive] = useState<Boolean>(false);
-    const [toAddress, setToAddress] = useState<any>();
-    const [amount, setAmount] = useState<any>();
    
     const [searchQuery, setSearchQuery] = useState<any>("");
     const [buyBDXDomain, setBuyBDXDomain] = useState<Boolean>(false);
     const [importToken, setImportToken] = useState<Boolean>(false);
     const [isHistory, setIsHistory] = useState<Boolean>(false);
 
-    const [balance, setBalance] = useState<number>(0);
     const [currentCoin, setCurrentCoin] = useState<any>('');
+    
     const location = useLocation();
     const {name,rawId,publicKeys} = location.state || {}; // Safely destructure state
     console.log(name,rawId,publicKeys);
+    
     // Mock data for crypto items
     const cryptoItems = [
         { name: "BDX", desc: "Beldex", type: "COIN", price: "$0.0789", change: "-0.14%", icon: bitcoinLogo, color: "red" },
@@ -43,44 +41,8 @@ function User() {
         setIsTransfer(false);
     }
     return (
-        <div className="container"> {(isTransfer && !(isSend||isReceive)) ?
-         <div >
-            <div style={tokenheader}>
-                <span style={arrow} onClick={handleBackClick}>‹</span> {/* Back Arrow */}
-                <div style={tokenContent}>
-                    <h3> {currentCoin["name"]} </h3>
-                    <p> {currentCoin["type"]} | {currentCoin["desc"]} </p>
-                </div>
-                <img src={notification}
-                    style={Icon}
-                    alt="Notification Icon" />
-                <img src={discover}
-                    style={Icon}
-                    alt="Discover Icon" />
-            </div>
-            <div style={coinInfo}>
-                <h2> {currentCoin["name"]} </h2>
-                <p>{balance} {currentCoin["name"]}</p>
-            </div>
-            <div style={transferButtons}>
-                <div><img src={downArrow}
-                    style={transferIcon}
-                    alt="downArrow Icon"  onClick={()=>setIsSend(true)}/>
-                    <p>Send</p>
-                </div>
-                <div>
-                    <img src={upArrow}
-                        style={transferIcon}
-                        alt="upArrow Icon" onClick={()=>setIsReceive(true)}/>
-                    <p>Receive</p>
-                </div>
-            </div>
-            <div style={history}>
-                <p>history</p>
-            </div>
-
-        </div> :<>
-        {!(isSend||isReceive) && 
+        <div className="container"> {(isTransfer) ?
+            <Transfer currentCoin={currentCoin} handleBackClick={handleBackClick}/> :
             <div style={containerStyle}>
                 <div style={mainContents}>
                     {/* Header section*/}
@@ -152,138 +114,12 @@ function User() {
                 </div>
             </div>
         }
-
-        {isSend && <>
-            {/* Header */}
-            <div style={header}>
-                    <span style={arrow} onClick={()=>setIsSend(false)}>‹</span> {/* Back Arrow */}
-                    <h2 style={title}>Send</h2>
-                </div>
-            
-            {/* Tramsfer Section */}
-          <div style={transferContainer}>
-            <form style={addressContainer}>
-              <input
-                style={inputField}
-                type="text"
-                value={toAddress}
-                onChange={(e) => setToAddress(e.target.value)}
-                placeholder="Address or Domain Name"
-              />
-              <input
-                style={inputField}
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={currentCoin['name']+ ' Amount'}
-              />
-              <p> available: {balance}</p>
-              <button style={{...submitButton,  backgroundColor: (toAddress && amount) ? '#8b6b99' : '#cfcad2'}} disabled={name.length < 4} onClick={(e)=>{e.preventDefault()}}>Next</button>
-            </form>
-          </div>
-        </>
-        }
-
-        {isReceive &&        
-        <div style={header}>
-                <span style={arrow} onClick={()=>setIsReceive(false)}>‹</span> {/* Back Arrow */}
-                <h2 style={title}>Receive</h2>
-                <p>{address}</p>
-            </div>}
-            </>
-        }
         </div>
     )
 
 }
 
 // Styles
-const transferContainer: React.CSSProperties = {
-  textAlign: 'left',
-  padding:'10px',
-//   lineHeight:'80px',
-}
-
-const addressContainer: React.CSSProperties = {
-  width: '100%',
-};
-
-const inputField: React.CSSProperties = {
-  paddingLeft: '15px',
-  width: '100%',
-  height: '55px',
-  fontSize: '15px',
-  boxSizing: 'border-box', // Ensure padding doesn't exceed width
-  outline: 'none', // Prevents blue border
-  marginBottom:'20px'
-
-};
-
-const submitButton: React.CSSProperties = {
-  width: '100%',
-  padding: '15px 0',
-  borderRadius: '27px',
-  fontSize: '20px',
-  backgroundColor: '#e9ecef',
-  border: 'none',
-  cursor: 'pointer',
-  marginTop: '10px', // Add space between input and button
-  outline: 'none', // Prevents blue border
-};
-//Transaction styles
-const tokenheader: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    border: '1px dotted lavender',
-    backgroundColor: '#fff',
-    height: '75px',
-    marginBottom: '10px'
-}
-const tokenContent: React.CSSProperties = {
-    lineHeight: '10px',
-    textAlign: 'left',
-
-}
-const coinInfo: React.CSSProperties = {
-    border: '1px solid black',
-    borderRadius: '15px',
-    height: '120px',
-    marginBottom: '10px'
-}
-const transferButtons: React.CSSProperties = {
-    marginTop: '30px',
-    display: 'flex',
-    textAlign: 'center',
-    justifyContent: 'space-around',
-    lineHeight: '10px',
-    borderBottom: '1px solid #cfcad2'
-}
-const transferIcon: React.CSSProperties = {
-    backgroundColor: '#cfcad2',
-    padding: '15px',
-    borderRadius: '50px'
-}
-const history: React.CSSProperties = {
-
-}
-
-const arrow: React.CSSProperties = {
-    color: '#000',
-    fontSize: '40px',
-    cursor: 'pointer', // Indicates it's clickable
-    marginRight: '10px',
-    paddingRight: '10px'
-};
-
-const title : React.CSSProperties = {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    margin: '0 0 0 30px',
-    flexGrow: 1,
-    textAlign: 'left'
-}
-
 const containerStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",

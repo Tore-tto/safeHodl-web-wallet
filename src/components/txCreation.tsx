@@ -2,7 +2,6 @@ import Web3, { HexString } from 'web3';
 import { ethers } from 'ethers';
 import axios from 'axios';
 
-import {tokens} from '../token/tokens';
 import {
     chainIdandType,
     chainInfo,
@@ -10,6 +9,7 @@ import {
     ENTRYPOINT,
     PAYMASTER_ADDRESS,
     SECP256R1_VERIFIER,
+    LOUICE_FACTORY
 } from './chainInfo';
 
 import {fetchERC20Balance} from './estimateAddress';
@@ -17,11 +17,10 @@ import signUserOperation from './signTx';
 
 import Entrypoint from '../abi/entrypoint.json';
 import TransactionAbi from '../abi/TransactionAbi.json'
-import LouiceFactory from '../abi/LouiceFactory.json'
 
-type TokenKey = keyof typeof tokens;
+type TokenKey =  {name: string; symbol: string; type: string; decimals: number; address: string };
 
-type UserOperation = {
+export type UserOperation = {
     sender: HexString;
     nonce: HexString;
     initCode: HexString;
@@ -52,7 +51,7 @@ async function getChainDetails(web3: Web3) {
   
     return {
       userOpProvider,
-      LOUICE_FACTORY: chainInfo[chainType].LOUICE_FACTORY,
+      LOUICE_FACTORY,
       entryContract: new web3.eth.Contract(Entrypoint.abi as any, ENTRYPOINT),
     };
 }
@@ -186,8 +185,26 @@ async function getSponserFromPaymaster(userOp:any, ERC20_contract:HexString) {
       return response.data;
 }
 
+export const signAndSubmitUserOp = async(web3:any, rawId:string, userOp:UserOperation) => {
+    const {entryContract} = await getChainDetails(web3);
 
-const createTx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeType:TokenKey) => {
+    const userOpHash = await entryContract.methods.getUserOpHash(userOp).call();
+    console.log({ userOpHash });
+
+    userOp.signature = await personalSignIn(userOpHash, rawId);
+
+    console.log({ userOp });
+
+    const OpHash = await sendUserOperation(web3, userOp);
+    if (await isApiResponseError(OpHash))
+        return { error: true, message:OpHash?.error?.message || "Failed to send user operation."  };
+
+    console.log('userOperation hash', OpHash);
+
+    return { error: false, message: "", opHash:OpHash.result};
+}
+
+const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeAsset:TokenKey) => {
     console.log('createTx function calling...');
     const {userOpProvider, LOUICE_FACTORY, entryContract} = await getChainDetails(web3);
     try {
@@ -244,79 +261,67 @@ const createTx = async (web3:any, walletAddress:HexString, rawId:string, publicK
         userOp.preVerificationGas = preVerificationGas;
         userOp.verificationGasLimit = verificationGasLimit;
         userOp.callGasLimit = callGasLimit;
-        // userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
 
-        // const { maxFeePerGas } = await userOpProvider.getFeeData();
         userOp.maxFeePerGas = maxFeePerGas;
         const {maxPriorityFeePerGas} = await userOpProvider.send("skandha_getGasPrice",[]);
         console.log({maxPriorityFeePerGas});
         userOp.maxPriorityFeePerGas = maxPriorityFeePerGas; //temporarily
 
+        let requiredFee = 0;
         if(!(paymasterAndData === "0x")){
-            console.log("Paymaster and data provided");
-            console.log({executeParams});
-            const additionalGas = window.BigInt(35000);
-            const {exchangeRate} = await getExchangeRate(executeParams[3]);
-            console.log("exchangeRate",exchangeRate);
+                console.log("Paymaster and data provided");
+                console.log({executeParams});
+                const additionalGas = window.BigInt(35000);
+                const {exchangeRate} = await getExchangeRate(executeParams[3]);
+                console.log("exchangeRate",exchangeRate);
+                const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
+                const actualTokenCost = ((totalGas * window.BigInt(maxFeePerGas) + (additionalGas * window.BigInt(maxFeePerGas))) * window.BigInt(exchangeRate)) / window.BigInt(1e18);
+                
+                requiredFee = Number(actualTokenCost) / 10 ** feeAsset.decimals;
+                console.log("Transaction actualTokenCost :", requiredFee);
+                
+                const chainID = await web3.eth.getChainId();
+                const hexChainID = `0x${chainID.toString(16)}` as keyof typeof chainIdandType;
+                const balance =  await fetchERC20Balance(web3, walletAddress,hexChainID, feeAsset.name);
+                if(requiredFee > balance)
+                return { error: true, message: `Insufficient balance. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}`};
+    
+                const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
+                userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
+                
+                const paymasterData = await getSponserFromPaymaster(userOp, executeParams[3]);
+                if(paymasterData.error)
+                    return { error: true, message: `${paymasterData.error?.message}. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}` || "Failed to get paymasterData."};
+    
+                userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;
+        }else{
             const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
-            const actualTokenCost = ((totalGas * window.BigInt(maxFeePerGas) + (additionalGas * window.BigInt(maxFeePerGas))) * window.BigInt(exchangeRate)) / window.BigInt(1e18);
-            
-            const tokenDetails = tokens[feeType];
-
-            if (!tokenDetails || typeof tokenDetails.decimals !== "number") {
-                throw new Error(`Invalid token details for ${feeType}`);
-            }
-            const requiredBalance = Number(actualTokenCost) / 10 ** tokenDetails.decimals;
-            console.log("Transaction actualTokenCost :", requiredBalance);
-            const balance =  await fetchERC20Balance(web3, walletAddress, feeType);
-            if(requiredBalance > balance)
-            return { error: true, message: `Insufficient balance. need ${requiredBalance} ${feeType} available ${balance} ${feeType}`};
-
-            const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
-            userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
-            
-            const paymasterData = await getSponserFromPaymaster(userOp, executeParams[3]);
-            if(paymasterData.error)
-                return { error: true, message: `${paymasterData.error?.message}. need ${requiredBalance} ${feeType} available ${balance} ${feeType}` || "Failed to get paymasterData."  };
-
-            userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;
+            console.log({totalGas});
+            requiredFee = Number(totalGas * window.BigInt(maxFeePerGas))/10 ** 18;
+            console.log({requiredFee});
         }
-
-        const userOpHash = await entryContract.methods.getUserOpHash(userOp).call();
-        console.log({ userOpHash });
-
-        userOp.signature = await personalSignIn(userOpHash, rawId);
-
-        console.log({ userOp });
-
-        const OpHash = await sendUserOperation(web3, userOp);
-        if (await isApiResponseError(OpHash))
-            return { error: true, message:OpHash?.error?.message || "Failed to send user operation."  };
-
-        console.log('userOperation hash', OpHash);
-
-        return { error: false, message: "", opHash:OpHash.result};
+        return { error: false, message: "", userOp:userOp, requiredFee:requiredFee.toString()};
     } catch (err:any) {
         console.error("Error in createTx:", err);
         return { error: true, message: err.message || "Transaction failed." };
     }
 };
 
-export const contractETHTx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], receiverAddress:HexString, amount:number, feeType:TokenKey) => {
+export const createUserOpETHTx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], receiverAddress:HexString, amount:number, feeAsset: { name: string; symbol: string; type: string; decimals: number; address: string }) => {
     var callData;
     var executeParams;
     var paymasterAndData;
-    if(feeType === "ethereum"){
+    if(feeAsset.type === "COIN"){
         console.log("normal transaction")
         callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x", "0x0000000000000000000000000000000000000000", "0x"]);
         executeParams = [receiverAddress, amount, "0x", "0x0000000000000000000000000000000000000000", "0x"];
         paymasterAndData = "0x";
     }
     else{
-        console.log("ERC20 as a fee transaction",feeType)
-        const ERC20_contract = tokens[feeType].address;
+        console.log("ERC20 as a fee transaction",feeAsset)
+        const ERC20_contract = feeAsset.address;
         console.log({ERC20_contract});
-        const dummyAmount = 1 * (10 ** tokens[feeType].decimals);
+        const dummyAmount = 1 * (10 ** feeAsset.decimals);
         const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, dummyAmount]);
         callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x", ERC20_contract, approveData]);
         executeParams = [receiverAddress, amount, "0x", ERC20_contract, approveData];
@@ -324,29 +329,29 @@ export const contractETHTx = async (web3:any, walletAddress:HexString, rawId:str
     }
         
 
-    return createTx(web3, walletAddress, rawId, publicKeys, callData, executeParams, paymasterAndData, feeType);
+    return createUserOp(web3, walletAddress, rawId, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
 };
 
-export const contractERC20Tx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], contractAddress:HexString, receiverAddress:HexString, tokenAmount:number, feeType:TokenKey) => {
+export const createUserOpERC20Tx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], contractAddress:HexString, receiverAddress:HexString, tokenAmount:number, feeAsset:TokenKey) => {
     const data = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Transfer, [receiverAddress,tokenAmount]);
     var callData;
     var executeParams;
     var paymasterAndData;
-    if(feeType === "ethereum"){
+    if(feeAsset.type === "COIN"){
         console.log("normal transaction")
         callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data, "0x0000000000000000000000000000000000000000", "0x"]);
         executeParams = [contractAddress, 0, data, "0x0000000000000000000000000000000000000000", "0x"];
         paymasterAndData = "0x";
     }
     else{
-        console.log("ERC20 as a fee transaction",feeType)
-        const ERC20_contract = tokens[feeType].address;
+        console.log("ERC20 as a fee transaction",feeAsset)
+        const ERC20_contract = feeAsset.address;
         console.log({ERC20_contract});
-        const dummyAmount = 1 * (10 ** tokens[feeType].decimals);
+        const dummyAmount = 1 * (10 ** feeAsset.decimals);
         const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, dummyAmount]);
         callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data, ERC20_contract, approveData]);
         executeParams = [contractAddress, 0, data, ERC20_contract, approveData];
         paymasterAndData = PAYMASTER_ADDRESS + "F756Dd3123b69795d43cB6b58556b3c6786eAc13010000671a219600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013b5e557e4601a264c654f3f0235ed381fc08b5ffea980e403bc807e27433586b0eb1abe122723125fc4d62ef605943f53a0c87893af3cfd6d33c3924cb0a4328ab0da981c";
     }
-    return createTx(web3, walletAddress,rawId, publicKeys, callData, executeParams, paymasterAndData, feeType);
+    return createUserOp(web3, walletAddress,rawId, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
 }

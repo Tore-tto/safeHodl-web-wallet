@@ -2,12 +2,10 @@ import { ethers, BigNumber } from "ethers";
 import LouiceFactory from "../abi/LouiceFactory.json";
 import { HexString } from "web3";
 
-import {tokens} from '../token/tokens';
-import {SECP256R1_VERIFIER, SALT} from "./chainInfo"
-type TokenKey = keyof typeof tokens;
+import {coinList} from '../token/coinList';
+import {chainIdandType,chainInfo, SECP256R1_VERIFIER, SALT, LOUICE_FACTORY} from "./chainInfo"
 
 export const getEstimateAddress = async (web3:any, rawId: any, publicKeys:any[]): Promise<any> => {
-    const LOUICE_FACTORY = "0x0cA86987e13568500BCC4238a9d6F8988BAF6A86";
     const LouiceFactoryIn = new web3.eth.Contract(LouiceFactory.abi, LOUICE_FACTORY);
     
     const prefix = "0x04";
@@ -38,8 +36,15 @@ export const fetchBalance = async(web3:any, address:any): Promise<any> => {
     }
 }
 
-export const fetchERC20Balance = async (web3: any,  address: HexString, chain: TokenKey): Promise<any> => {
-    console.log("Fetching ERC20 balance for:", address, "on chain:", chain);
+export const fetchERC20Balance = async (web3: any,  address: HexString, chainId: keyof typeof chainIdandType, tokenName: string): Promise<any> => {
+    console.log("Fetching ERC20 balance for:", address, "on chain:", chainId, "Token of", tokenName);
+  
+    const filteredTokens = coinList[chainIdandType[chainId] as keyof typeof chainInfo];
+    const token = filteredTokens.find(token => token.name === tokenName);
+    if(!token){
+      console.error("Chain not found in tokens object:", tokenName);
+      return 0 ;
+    }
   
     // ABI for the ERC20 `balanceOf` method
     const erc20ABI = [
@@ -53,8 +58,8 @@ export const fetchERC20Balance = async (web3: any,  address: HexString, chain: T
     ];
   
     try {
-      if (chain in tokens) {
-        const { address: contractAddress, decimals } = tokens[chain];
+        const contractAddress = token?.address;
+        const decimals  = token?.decimals;
   
         // Validate the contract address
         if (web3.utils.isAddress(contractAddress)) {
@@ -66,10 +71,6 @@ export const fetchERC20Balance = async (web3: any,  address: HexString, chain: T
           console.error("Invalid contract address:", contractAddress);
           return 0;
         }
-      } else {
-        console.error("Chain not found in tokens object:", chain);
-        return 0;
-      }
     } catch (error) {
       console.error("Error fetching ERC20 balance:", error);
       return 0;

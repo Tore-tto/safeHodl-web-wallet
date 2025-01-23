@@ -20,15 +20,16 @@ function User() {
     
     const location = useLocation();
     const {name,rawId,publicKeys} = location.state || {}; // Safely destructure state
-    console.log(name,rawId,publicKeys);
-    
+    console.log(name, rawId, publicKeys);
+
     // Mock data for crypto items
     const cryptoItems = [
-        { name: "BDX", desc: "Beldex", type: "COIN", price: "$0.0789", change: "-0.14%", icon: bitcoinLogo, color: "red" },
-        { name: "POL", desc: "AmoyPolygon", type: "COIN", price: "$101,234", change: "-0.14%", icon: bitcoinLogo, color: "red" },
-        { name: "ETH", desc: "ShepoliaEthereum", type: "COIN", price: "$3,200", change: "+1.25%", icon: bitcoinLogo, color: "green" },
-        { name: "SAR", desc: "Sarvy", type: "TOKEN", price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
-        { name: "RON", desc: "Ronin", type: "TOKEN", price: "$0.0002124", change: "-10.23%", icon: bitcoinLogo, color: "red" },
+        // { symbol: "BDX", name: "Beldex", type: "COIN", chain:'56', price: "$0.0789", change: "-0.14%", icon: bitcoinLogo, color: "red" },
+        { symbol: "POL", name: "Amoy", type: "COIN", chain:'0x13882', price: "$101,234", change: "-0.14%", icon: bitcoinLogo, color: "red" },
+        { symbol: "ETH", name: "Sepolia", type: "COIN", chain:'0xaa36a7', price: "$3,200", change: "+1.25%", icon: bitcoinLogo, color: "green" },
+        { symbol: "SAR", name: "Sarvy", type: "TOKEN", chain:'0x13882', price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
+        { symbol: "RON", name: "Ronin", type: "TOKEN", chain:'0x13882', price: "$0.0002124", change: "-10.23%", icon: bitcoinLogo, color: "red" },
+        { symbol: "SHIB", name: "Shibua", type: "TOKEN", chain:'0xaa36a7', price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
     ];
 
     function processTransaction(index: any) {
@@ -42,7 +43,7 @@ function User() {
     }
     return (
         <div className="container"> {(isTransfer) ?
-            <Transfer currentCoin={currentCoin} handleBackClick={handleBackClick}/> :
+            <Transfer userInfo={location.state} currentCoin={currentCoin} handleBackClick={handleBackClick}/> :
             <div style={containerStyle}>
                 <div style={mainContents}>
                     {/* Header section*/}
@@ -84,10 +85,10 @@ function User() {
                             {!isHistory ? <div style={cryptoListContainer}>
                                 {cryptoItems.map((item, index) => (
                                     <div key={index} style={cryptoCardStyle} onClick={() => { processTransaction(index) }}>
-                                        <img src={item.icon} style={cryptoIconStyle} alt={item.name} />
+                                        <img src={item.icon} style={cryptoIconStyle} alt={item.symbol} />
                                         <div>
-                                            <strong>{item.name}</strong>
-                                            <p>{item.desc}</p>
+                                            <strong>{item.symbol}</strong>
+                                            <p>{item.name}</p>
                                         </div>
                                         <div style={{ textAlign: "right" }}>
                                             <strong>{item.price}</strong>

@@ -1,44 +1,325 @@
-import { useState } from "react";
+import React, { useState, useContext, useEffect } from "react";
+import { Web3Context } from './Transfer';
+import { feeTokens } from '../token/feeTokens';
+import { chainIdandType,chainInfo } from "./chainInfo";
+import { coinList } from "../token/coinList";
 
-export default function Send(props:any) {
-    const [toAddress, setToAddress] = useState<any>();
-    const [amount, setAmount] = useState<any>();
-    const [balance, setBalance] = useState<number>(0);
+import {createUserOpETHTx, createUserOpERC20Tx,UserOperation,signAndSubmitUserOp, getUserOperationByHash} from './txCreation'
+import { nullcheck } from "cbor/types/lib/decoder";
+
+export default function Send(props: any) {
+    const {web3, rawId, publicKeys, address,currentCoin, isSend } = props;
+    const balance = useContext(Web3Context);
+
+    //current network
+    const [chainName, setChainName] = useState<string>('');
+    
+    // user input details
+    const [toAddress, setToAddress] = useState<string>('0xb87a472325C42BfC137499539C1A966Bce9ce10A');
+    const [amount, setAmount] = useState<string>('1');
+    const [feeTokenOptions, setFeeTokenOptions] = useState<{ value: string; label: string }[]>([]);
+    const [feeType, setFeeType] = useState<string>('');
+    const [feeAsset, setFeeAsset] = useState<{ name: string; symbol: string; type: string; decimals: number; address: string }>();
+    
+    // validate user inputs
+    const [isValidAddress, setIsValidAddress] = useState<boolean>(true);
+    const [isValidAmount, setIsValidAmount] = useState<boolean>(true);
+    const [isNext, setIsNext] = useState<boolean>(false);
+
+    // Transaction(userOp) details
+    const [errorMessage, setErrorMessage] = useState<String>('');
+    const [aproxFee, setAproxFee] =  useState<string>('');
+    const [userOp, setUserOp] = useState<UserOperation>();
+
+
+    //Findout the default chain also the available gas tokens
+    useEffect(() => {
+        if (!currentCoin?.chain) return;
+        const chainId = currentCoin?.chain as keyof typeof chainIdandType;
+        const chainName = chainIdandType[chainId] as keyof typeof chainInfo;
+        setChainName(chainName);
+        // Filter tokens that match the current chain
+        const filteredTokens = feeTokens[chainName];
+
+        // Map to dropdown options
+        const tokenOptions = filteredTokens.map(token => ({
+            value: token.name,
+            label: token.symbol
+        }));
+
+        setFeeTokenOptions(tokenOptions);
+
+        // Find default token of type 'COIN'
+        const defaultFeeType = filteredTokens.find(token => token.type === "COIN");
+        if (!defaultFeeType){
+            console.error("There is no default fee type");
+            return;
+        }
+        setFeeType(defaultFeeType?.name);
+    }, [currentCoin]);
+
+    //Set symbol
+    useEffect(() => {
+        if (!chainName || !feeType) return;
+    
+        const filteredTokens = feeTokens[chainName];
+        const token = filteredTokens.find(token => token.name === feeType);
+        setFeeAsset(token);
+    }, [feeType, chainName]);
+
+    // calculate aprox fees
+    useEffect(()=>{
+        if(!isNext || !feeAsset) return;
+        console.log('next useEffect is called',feeType,feeAsset)
+        setAproxFee('');
+        console.log(feeAsset);
+        if(!feeAsset)
+            return;
+        let response:any = '';
+        const getUserOperation = async () => {
+            if (currentCoin?.type === 'COIN') {
+                console.log('Native coin userOp generation......... fee', feeType);
+                const sendAmount = web3.utils.toWei(amount, 'ether');
+                response = await createUserOpETHTx(web3, address, rawId, publicKeys, toAddress, parseFloat(sendAmount) || 0, feeAsset);
+                console.log(response);
+
+            }
+            else{
+                console.log('ERC20 userOp generation......... fee', feeType);
+                const alltoken = coinList[chainName];
+                const token = alltoken.find(token => token.name === currentCoin.name);
+                if(!token){
+                    console.error('unsupport coin from list')
+                    return;
+                }
+                const sendToken = web3.utils.toWei(amount, token.decimals);
+                response = await createUserOpERC20Tx(web3, address, rawId, publicKeys, token.address, toAddress,  parseFloat(sendToken) || 0, feeAsset);
+                console.log(response);
+            }
+
+            if(!response.error)
+            {
+                setAproxFee(response?.requiredFee);
+                setUserOp(response?.userOp);
+            }
+        }
+
+        getUserOperation();
+    },[isNext,feeAsset]);
+
+    // After entered address and amount
+    function validateInputs() {
+        let hasError = false;
+
+        if (!web3.utils.isAddress(toAddress)) {
+            setIsValidAddress(false);
+            hasError = true;
+        } else {
+            setIsValidAddress(true);
+        }
+
+        if (isNaN(Number(amount)) || Number(amount) <= 0) {
+            setIsValidAmount(false);
+            hasError = true;
+        } else {
+            setIsValidAmount(true);
+        }
+
+        if (!hasError) {
+            setIsNext(true);
+        }
+    }
+
+    async function handleNext() {
+        await validateInputs();
+    }
+
+    const handleChainChange = (e: any) => {
+        const newFeeType = e.target.value;
+        setFeeType(newFeeType);
+    };
+
+    const handleCloseTransfer = () => {
+        setIsNext(false);
+    }
+
+    const onConfirm = async () => {
+        if(!userOp)
+            return;
+
+        const response = await signAndSubmitUserOp(web3, rawId, userOp);
+        console.log(response);
+        if (!response.error) {
+            console.log('getUserOperationByHash function calling ...');
+            for (let i = 0; true; i++) {
+                const res = await getUserOperationByHash(web3, response.opHash);
+                const result = res.result;
+                if (!(result === null) && result.status) {
+                    console.log('Transaction status: ', result.status, result.transaction);
+
+                    if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
+                        if (result.status === 'Cancelled' || result.status === 'Reverted') {
+                            // handleError(`Transaction is ${result.status}. Try again later`);
+                        } else {
+                            console.log('Transaction completed successfully.');
+                        }
+                        // await handleAddTransaction(result.status, result);
+                        break;
+                    }
+                }
+
+                // Wait for a specified delay before retrying
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }else{
+            console.error(response.message);
+        }
+
+        isSend(false);
+
+    }
 
     return (
         <div>
             {/* Header */}
             <div style={header}>
-                <span style={arrow} onClick={() => props.isSend(false)}>‹</span> {/* Back Arrow */}
-                <h2 style={title}>Send</h2>
+                {isNext ? (
+                    <span style={arrow} onClick={handleCloseTransfer}>×</span>
+                ) : (
+                    <span style={arrow} onClick={() => isSend(false)}>‹</span>
+                )}
+                <h2 style={title}>Transfer</h2>
             </div>
 
-            {/* Tramsfer Section */}
-            <div style={transferContainer}>
-                <form style={addressContainer}>
-                    <input
-                        style={inputField}
-                        type="text"
-                        value={toAddress}
-                        onChange={(e) => setToAddress(e.target.value)}
-                        placeholder="Address or Domain Name"
-                    />
-                    <input
-                        style={inputField}
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder={props.currentCoin['name'] + ' Amount'}
-                    />
-                    <p> available: {balance}</p>
-                    <button style={{ ...submitButton, backgroundColor: (toAddress && amount) ? '#8b6b99' : '#cfcad2' }} disabled={!(toAddress && amount)} onClick={(e) => { e.preventDefault() }}>Next</button>
-                </form>
-            </div>
+            {/* Transfer Section */}
+            {isNext ? (
+                <div>
+                    <div style={amountSection}>
+                        <h3>-{amount} {currentCoin?.symbol}</h3>
+                    </div>
+
+                    {/* Transfer Details */}
+                    <div style={detailSection}>
+                        <DetailRow label="Asset" value={currentCoin?.symbol} />
+                        <DetailRow label="Wallet" address={address} />
+                        <DetailRow label="To" address={toAddress} bold />
+                        <DetailRow
+                            label="Gas Token(aprox)"
+                            selectOptions={feeTokenOptions}
+                            selectedValue={feeType}
+                            onChange={handleChainChange}
+                        />
+                        <DetailRow label="Network Fee" value={aproxFee +" "+ feeAsset?.symbol}/>
+                    </div>
+
+                    {/* Confirm Button */}
+                    <button style={confirmButton}  disabled={!(aproxFee && userOp)} onClick={onConfirm}>Confirm</button>
+                </div>
+            ) : (
+                <div style={transferContainer}>
+                    <form style={addressContainer}>
+                        <div style={inputFormField}>
+                            <input
+                                style={inputField}
+                                type="text"
+                                value={toAddress}
+                                onChange={(e) => setToAddress(e.target.value)}
+                                placeholder="Address or Domain Name"
+                            />
+                            {!isValidAddress && <p style={errorTextStyle}>Invalid address.</p>}
+                        </div>
+
+                        <div style={inputFormField}>
+                            <input
+                                style={inputField}
+                                type="number"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder={`${currentCoin?.name} Amount`}
+                            />
+                            {!isValidAmount && <p style={errorTextStyle}>Invalid amount.</p>}
+                        </div>
+                        <p>Available: {balance}</p>
+                        <button
+                            style={{ ...submitButton, backgroundColor: (toAddress && amount) ? '#8b6b99' : '#cfcad2' }}
+                            disabled={!(toAddress && amount)}
+                            onClick={(e) => { e.preventDefault(); handleNext(); }}>
+                            Next
+                        </button>
+                    </form>
+                </div>
+            )}
         </div>
     );
 }
 
+// Helper Component for Displaying Details
+const DetailRow = ({ label, value, address = '', bold = false, selectOptions, selectedValue, onChange }: any) => (
+    <div style={detailRow}>
+        <p style={detailLabel}>{label}</p>
+        {selectOptions ? (
+            <select value={selectedValue} onChange={onChange} style={feeOptionBox}>
+                {selectOptions.map((option: any) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+        ) : (
+            <p style={bold ? detailValueBold : detailValue}>{address || value}</p>
+        )}
+    </div>
+);
+
+
+
 // Styles
+const amountSection: React.CSSProperties = {
+    marginBottom: "20px",
+};
+
+const detailSection: React.CSSProperties = {
+    textAlign: "left",
+    marginBottom: "30px",
+};
+
+const confirmButton: React.CSSProperties = {
+    width: "100%",
+    padding: "15px",
+    backgroundColor: "#8b6b99",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "18px",
+    cursor: "pointer",
+};
+
+const detailRow: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: 'center', // Ensure vertical alignment
+    marginBottom: "10px",
+    width: '100%',
+};
+
+const detailLabel: React.CSSProperties = {
+    color: "#aaa",
+    fontSize: "14px",
+};
+
+const detailValue: React.CSSProperties = {
+    fontSize: "14px",
+};
+
+const detailValueBold: React.CSSProperties = {
+    fontSize: "16px",
+    fontWeight: "bold",
+};
+
+const errorTextStyle = {
+    color: 'red',
+    fontSize: '12px',
+    marginTop: '4px',
+};
 const transferContainer: React.CSSProperties = {
     textAlign: 'left',
     padding: '10px',
@@ -49,6 +330,10 @@ const addressContainer: React.CSSProperties = {
     width: '100%',
 };
 
+const inputFormField: React.CSSProperties = {
+    marginBottom: '20px'
+};
+
 const inputField: React.CSSProperties = {
     paddingLeft: '15px',
     width: '100%',
@@ -56,8 +341,6 @@ const inputField: React.CSSProperties = {
     fontSize: '15px',
     boxSizing: 'border-box', // Ensure padding doesn't exceed width
     outline: 'none', // Prevents blue border
-    marginBottom: '20px'
-
 };
 
 const submitButton: React.CSSProperties = {
@@ -95,3 +378,13 @@ const header: React.CSSProperties = {
     border: '1px dotted lavender',
     marginBottom: '20px',
 }
+
+// **Dropdown Style**
+const feeOptionBox: React.CSSProperties = {
+    width: '20%',
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid black',
+    textAlign: 'left',
+    appearance: 'none',  // Remove default styling (for Safari)
+};

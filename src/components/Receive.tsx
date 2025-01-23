@@ -1,14 +1,15 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 export default function Receive(props:any) {
-    const [address, setAddress] = useState<any>();
     
     return (
         <div>
             <div style={header}>
                 <span style={arrow} onClick={() => props.isReceive(false)}>‹</span> {/* Back Arrow */}
                 <h2 style={title}>Receive</h2>
-                <p>{address}</p>
+            </div>
+            <div style={addressContainer}>
+                <p>{props.address}</p>
             </div>
         </div>
     );
@@ -38,4 +39,8 @@ const header: React.CSSProperties = {
     justifyContent: 'space-between',
     border: '1px dotted lavender',
     marginBottom: '20px',
+}
+
+const addressContainer:React.CSSProperties = {
+    
 }

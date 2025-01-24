@@ -16,7 +16,7 @@ export default function Send(props: any) {
     
     // user input details
     const [toAddress, setToAddress] = useState<string>('0xb87a472325C42BfC137499539C1A966Bce9ce10A');
-    const [amount, setAmount] = useState<string>('1');
+    const [amount, setAmount] = useState<string>('');
     const [feeTokenOptions, setFeeTokenOptions] = useState<{ value: string; label: string }[]>([]);
     const [feeType, setFeeType] = useState<string>('');
     const [feeAsset, setFeeAsset] = useState<{ name: string; symbol: string; type: string; decimals: number; address: string }>();
@@ -29,8 +29,13 @@ export default function Send(props: any) {
     // Transaction(userOp) details
     const [errorMessage, setErrorMessage] = useState<String>('');
     const [aproxFee, setAproxFee] =  useState<string>('');
+    const [isBalanceOk, setIsBalanceOk] = useState<boolean>(false);
     const [userOp, setUserOp] = useState<UserOperation>();
 
+    // screens for userexperiance
+    const [loading, setLoading] = useState<boolean>(false); 
+    const [showPopup, setShowPopup] = useState<boolean>(false);
+    const [showErrorPopup, setShowErrorPopup] = useState(false);
 
     //Findout the default chain also the available gas tokens
     useEffect(() => {
@@ -70,6 +75,7 @@ export default function Send(props: any) {
     // calculate aprox fees
     useEffect(()=>{
         if(!isNext || !feeAsset) return;
+        setLoading(true);
         console.log('next useEffect is called',feeType,feeAsset)
         setAproxFee('');
         console.log(feeAsset);
@@ -101,6 +107,15 @@ export default function Send(props: any) {
             {
                 setAproxFee(response?.requiredFee);
                 setUserOp(response?.userOp);
+                console.log((Number(amount) + Number(response?.requiredFee)), balance)
+                if(currentCoin?.name === feeAsset.name){
+                    if(balance && ((Number(amount) + Number(response?.requiredFee)) <= balance))
+                        setIsBalanceOk(true);
+                }else{
+                    if(balance && (Number(amount)) <= balance)
+                        setIsBalanceOk(true);
+                }
+                setLoading(false);
             }
         }
 
@@ -122,7 +137,15 @@ export default function Send(props: any) {
             setIsValidAmount(false);
             hasError = true;
         } else {
-            setIsValidAmount(true);
+            
+            if(balance && Number(amount) <= balance)
+            {
+                console.log(balance,(Number(amount) <= balance))
+                setIsValidAmount(true);
+            } else{
+                setIsValidAmount(false);
+                hasError = true;
+            }            
         }
 
         if (!hasError) {
@@ -213,7 +236,7 @@ export default function Send(props: any) {
                     </div>
 
                     {/* Confirm Button */}
-                    <button style={confirmButton}  disabled={!(aproxFee && userOp)} onClick={onConfirm}>Confirm</button>
+                    <button style={confirmButton}  disabled={!(aproxFee && userOp && isBalanceOk)} onClick={onConfirm}>Confirm</button>
                 </div>
             ) : (
                 <div style={transferContainer}>

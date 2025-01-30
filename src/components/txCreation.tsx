@@ -165,7 +165,7 @@ const getExchangeRate = async (web3:Web3, ERC20_contract:HexString) => {
         method: "pm_getApprovedTokens",
         params:{chainId: chainId}
     }
-    const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
+    const response = await axios.post('https://paymaster.beldex.dev/paymaster', pm_data, {
         headers: { 'Content-Type': 'application/json' }
     });
     console.log('getExchange rate completed : ',response.data.result)
@@ -186,7 +186,7 @@ async function getSponserFromPaymaster(web3:Web3,userOp:any, ERC20_contract:HexS
           chainId: chainId
         }
       }
-      const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
+      const response = await axios.post('https://paymaster.beldex.dev/paymaster', pm_data, {
         headers: { 'Content-Type': 'application/json' }
       });
     

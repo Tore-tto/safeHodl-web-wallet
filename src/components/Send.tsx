@@ -15,7 +15,7 @@ export default function Send(props: any) {
     const [chainName, setChainName] = useState<string>('');
     
     // user input details
-    const [toAddress, setToAddress] = useState<string>('0x61e531E13c3980395cb4B6655366E1e8F7D053c9');
+    const [toAddress, setToAddress] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
     const [feeTokenOptions, setFeeTokenOptions] = useState<{ value: string; label: string }[]>([]);
     const [feeType, setFeeType] = useState<string>('');

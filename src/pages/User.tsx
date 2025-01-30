@@ -30,6 +30,8 @@ function User() {
         { symbol: "SAR", name: "Sarvy", type: "TOKEN", chain:'0x13882', price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
         { symbol: "RON", name: "Ronin", type: "TOKEN", chain:'0x13882', price: "$0.0002124", change: "-10.23%", icon: bitcoinLogo, color: "red" },
         { symbol: "SHIB", name: "Shibua", type: "TOKEN", chain:'0xaa36a7', price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
+        { symbol: "TT", name: "Toretto", type: "TOKEN", chain:'0xaa36a7', price: "$0.89", change: "-2.56%", icon: bitcoinLogo, color: "red" },
+
     ];
 
     function processTransaction(index: any) {

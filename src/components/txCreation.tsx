@@ -7,7 +7,6 @@ import {
     chainInfo,
     SALT,
     ENTRYPOINT,
-    PAYMASTER_ADDRESS,
     SECP256R1_VERIFIER,
     LOUICE_FACTORY
 } from './chainInfo';
@@ -48,15 +47,20 @@ async function getChainDetails(web3: Web3) {
     const userOpProvider = new ethers.providers.JsonRpcProvider(
       chainInfo[chainType].USER_OP_RPC_URL
     );
-  
+    const PAYMASTER_ADDRESS = chainInfo[chainType].PAYMASTER_ADDRESS;
     return {
       userOpProvider,
-      LOUICE_FACTORY,
+      PAYMASTER_ADDRESS,
       entryContract: new web3.eth.Contract(Entrypoint.abi as any, ENTRYPOINT),
     };
 }
-  
-  
+
+// Utility to get only chain ID
+async function getChainID(web3: Web3) {
+    const chainID = await web3.eth.getChainId();
+    return chainID.toString(); 
+}
+
 // Utility to get sender address from initCode
 async function getSenderAddress(entryContract: any, initCode: HexString): Promise<HexString> {
     var sender ='' as HexString;
@@ -151,33 +155,38 @@ const isApiResponseError = async (response:object) => {
 };
 
 //Paymaster Process
-const getExchangeRate = async (ERC20_contract:any) => {
+const getExchangeRate = async (web3:Web3, ERC20_contract:HexString) => {
     console.log("getExchangeRate(contract address)", ERC20_contract);
+    const chainId = await getChainID(web3); 
+
     const pm_data = {
         jsonrpc: "2.0",
         id: "0",
         method: "pm_getApprovedTokens",
-        params:{}
+        params:{chainId: chainId}
     }
-    const response = await axios.post('https://paymaster.beldex.dev/paymaster', pm_data, {
+    const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
         headers: { 'Content-Type': 'application/json' }
     });
-    
+    console.log('getExchange rate completed : ',response.data.result)
     const tokens = response.data.result || [];
     return tokens.find((token: any)  => token.address.toLowerCase() === ERC20_contract.toLowerCase());
 }
 
-async function getSponserFromPaymaster(userOp:any, ERC20_contract:HexString) {
+async function getSponserFromPaymaster(web3:Web3,userOp:any, ERC20_contract:HexString) {
+    const chainId = await getChainID(web3); 
+
     const pm_data = {
         jsonrpc: "2.0",
         id: "0",
         method: "pm_sponsorUserOperation",
         params:{
           request: userOp,
-          token_address: ERC20_contract
+          token_address: ERC20_contract,
+          chainId: chainId
         }
       }
-      const response = await axios.post('https://paymaster.beldex.dev/paymaster', pm_data, {
+      const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
         headers: { 'Content-Type': 'application/json' }
       });
     
@@ -206,7 +215,7 @@ export const signAndSubmitUserOp = async(web3:any, rawId:string, userOp:UserOper
 
 const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeAsset:TokenKey) => {
     console.log('createTx function calling...');
-    const {userOpProvider, LOUICE_FACTORY, entryContract} = await getChainDetails(web3);
+    const {userOpProvider, PAYMASTER_ADDRESS, entryContract} = await getChainDetails(web3);
     try {
         const prefix = "0x04";
         const publicKey = prefix +publicKeys[0].slice(2) + publicKeys[1].slice(2);
@@ -272,7 +281,7 @@ const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, pub
                 console.log("Paymaster and data provided");
                 console.log({executeParams});
                 const additionalGas = window.BigInt(35000);
-                const {exchangeRate} = await getExchangeRate(executeParams[3]);
+                const {exchangeRate} = await getExchangeRate(web3,executeParams[3]);
                 console.log("exchangeRate",exchangeRate);
                 const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
                 const actualTokenCost = ((totalGas * window.BigInt(maxFeePerGas) + (additionalGas * window.BigInt(maxFeePerGas))) * window.BigInt(exchangeRate)) / window.BigInt(1e18);
@@ -288,12 +297,17 @@ const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, pub
     
                 const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
                 userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
-                
-                const paymasterData = await getSponserFromPaymaster(userOp, executeParams[3]);
-                if(paymasterData.error)
-                    return { error: true, message: `${paymasterData.error?.message}. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}` || "Failed to get paymasterData."};
-    
-                userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;
+                const paymasterData = await getSponserFromPaymaster(web3,userOp, executeParams[3]);
+
+                if (paymasterData.error) {
+                    let errorMessage = "Failed to get paymasterData."; // Default message
+                    if (paymasterData.error.code === 3) {
+                        return {error: true,message:errorMessage = `${paymasterData.error?.message}. Need ${requiredFee} ${feeAsset.symbol}, available ${balance}`};
+                    } else if (paymasterData.error.code === 2) {
+                        return {error: true,message:errorMessage += ` ${paymasterData.error?.message || ""}`};
+                    }
+                }
+                    userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;    
         }else{
             const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
             console.log({totalGas});
@@ -318,6 +332,7 @@ export const createUserOpETHTx = async (web3:any, walletAddress:HexString, rawId
         paymasterAndData = "0x";
     }
     else{
+        const{PAYMASTER_ADDRESS} = await getChainDetails(web3)
         console.log("ERC20 as a fee transaction",feeAsset)
         const ERC20_contract = feeAsset.address;
         console.log({ERC20_contract});
@@ -344,6 +359,7 @@ export const createUserOpERC20Tx = async (web3:any, walletAddress:HexString, raw
         paymasterAndData = "0x";
     }
     else{
+        const{PAYMASTER_ADDRESS} = await getChainDetails(web3)
         console.log("ERC20 as a fee transaction",feeAsset)
         const ERC20_contract = feeAsset.address;
         console.log({ERC20_contract});

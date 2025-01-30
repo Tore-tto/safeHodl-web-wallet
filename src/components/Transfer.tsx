@@ -16,8 +16,8 @@ import notification from '../assets/notification.png';
 import discover from '../assets/discover.png';
 import downArrow from '../assets/downarrow.png';
 import upArrow from '../assets/uparrow.png';
-
-
+import TransactionHistory from './TransactionHistory';
+import {getAllTransactions, saveTransaction, clearTransactions} from './database/indexDb'
 export default function Transfer(props: any) {
     const { currentCoin, handleBackClick, userInfo } = props;
     const { name, rawId, publicKeys } = userInfo || {}; // Safely destructure userInfo
@@ -27,6 +27,7 @@ export default function Transfer(props: any) {
     const [balance, setBalance] = useState<number>(0);
     const [isSend, setIsSend] = useState<boolean>(false);
     const [isReceive, setIsReceive] = useState<boolean>(false);
+    const [transactions, setTransactions] = useState([] as any);
 
     console.log('chainType:', currentCoin?.chain);
 
@@ -44,6 +45,15 @@ export default function Transfer(props: any) {
         const web3URL = getBundelerURL(currentCoin.chain);
         setWeb3(new Web3(web3URL));
     }, [currentCoin]);
+    
+    useEffect(() => {
+        const fetchTransactions = async () => {
+          const allTransactions = await getAllTransactions(props.rawId);
+          console.log({allTransactions}); 
+          setTransactions(allTransactions);
+        };
+        fetchTransactions();
+      }, []);
 
     //Calculating estimate address
     useEffect(() => {
@@ -119,7 +129,8 @@ export default function Transfer(props: any) {
                     </div>
                     <div style={history}>
                         <p>History</p>
-                    </div>
+                        <TransactionHistory transactions={transactions}></TransactionHistory>
+                        </div>
                 </div>
             )}
             <Web3Context.Provider value={balance}>

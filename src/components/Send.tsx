@@ -15,7 +15,7 @@ export default function Send(props: any) {
     const [chainName, setChainName] = useState<string>('');
     
     // user input details
-    const [toAddress, setToAddress] = useState<string>('0xb87a472325C42BfC137499539C1A966Bce9ce10A');
+    const [toAddress, setToAddress] = useState<string>('0x61e531E13c3980395cb4B6655366E1e8F7D053c9');
     const [amount, setAmount] = useState<string>('');
     const [feeTokenOptions, setFeeTokenOptions] = useState<{ value: string; label: string }[]>([]);
     const [feeType, setFeeType] = useState<string>('');
@@ -116,6 +116,9 @@ export default function Send(props: any) {
                         setIsBalanceOk(true);
                 }
                 setLoading(false);
+            }else{
+                setAproxFee('');
+                setUserOp(undefined);
             }
         }
 

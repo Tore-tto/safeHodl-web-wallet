@@ -11,11 +11,11 @@ export const chainIdandType = {
 
 export const chainInfo = {
     Sepolia: {
-        USER_OP_RPC_URL: "http://209.126.86.93:14337/rpc",
-        PAYMASTER_ADDRESS : "0x835798C4c595b140F1a94e98F13D059f4bE7a29C"
+        USER_OP_RPC_URL: "https://sepoliabundler.beldex.dev/rpc",
+        PAYMASTER_ADDRESS : "0x1d71a281B418a1527Cc820AcD3930745cF8F9b73"
     },
     Amoy: {
-        USER_OP_RPC_URL: "https://bundler.beldex.dev/rpc",
+        USER_OP_RPC_URL: "https://amoybundler.beldex.dev/rpc",
         PAYMASTER_ADDRESS:  "0xDd74396fb58c32247d8E2410e853a73f71053252"
     }
 }

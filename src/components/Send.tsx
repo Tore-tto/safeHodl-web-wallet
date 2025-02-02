@@ -5,7 +5,10 @@ import { chainIdandType,chainInfo } from "./chainInfo";
 import { coinList } from "../token/coinList";
 
 import {createUserOpETHTx, createUserOpERC20Tx,UserOperation,signAndSubmitUserOp, getUserOperationByHash} from './txCreation'
-import { nullcheck } from "cbor/types/lib/decoder";
+import { HexString } from "web3";
+import Loading from "./popups/Loading";
+import TransactionPopup from "./popups/TransactionPopup";
+import ErrorPopup from "./popups/ErrorPupUp";
 
 export default function Send(props: any) {
     const {web3, rawId, publicKeys, address,currentCoin, isSend } = props;
@@ -27,10 +30,14 @@ export default function Send(props: any) {
     const [isNext, setIsNext] = useState<boolean>(false);
 
     // Transaction(userOp) details
-    const [errorMessage, setErrorMessage] = useState<String>('');
     const [aproxFee, setAproxFee] =  useState<string>('');
     const [isBalanceOk, setIsBalanceOk] = useState<boolean>(false);
     const [userOp, setUserOp] = useState<UserOperation>();
+
+    const [txStatus, setTxStatus] = useState<String>('');
+    const [txHash, setTxHash] = useState<HexString>('');
+    const [errorMessage, setErrorMessage] = useState<String>('');
+
 
     // screens for userexperiance
     const [loading, setLoading] = useState<boolean>(false); 
@@ -72,6 +79,39 @@ export default function Send(props: any) {
         setFeeAsset(token);
     }, [feeType, chainName]);
 
+    // Monitor txStatus and show popup when it gets data
+    useEffect(() => {
+        if (txStatus) {
+            setShowPopup(true);
+        }
+        if(errorMessage){
+            setShowErrorPopup(true);
+        }
+    }, [txStatus, errorMessage]);
+
+    // Handle Loading
+    const stopLoading = () => {
+        setLoading(false);
+        setToAddress('');
+        setAmount('');
+    };
+
+    // Handle Popups
+    const handleClosePopup = () => {
+        setShowPopup(false);
+        setShowErrorPopup(false);
+        setErrorMessage('');
+        setTxStatus('');
+        setTxHash('');
+    };
+
+    // Handle errors
+    const handleError = (error:any) => {
+        console.log('Error occurred: ', error); // Log for debugging
+        setErrorMessage(error);
+        stopLoading();
+    };
+
     // calculate aprox fees
     useEffect(()=>{
         if(!isNext || !feeAsset) return;
@@ -83,42 +123,50 @@ export default function Send(props: any) {
             return;
         let response:any = '';
         const getUserOperation = async () => {
-            if (currentCoin?.type === 'COIN') {
-                console.log('Native coin userOp generation......... fee', feeType);
-                const sendAmount = web3.utils.toWei(amount, 'ether');
-                response = await createUserOpETHTx(web3, address, rawId, publicKeys, toAddress, parseFloat(sendAmount) || 0, feeAsset);
-                console.log(response);
+            try {
+                if (currentCoin?.type === 'COIN') {
+                    console.log('Native coin userOp generation......... fee', feeType);
+                    const sendAmount = web3.utils.toWei(amount, 'ether');
+                    response = await createUserOpETHTx(web3, address, rawId, publicKeys, toAddress, parseFloat(sendAmount) || 0, feeAsset);
+                    console.log(response);
 
-            }
-            else{
-                console.log('ERC20 userOp generation......... fee', feeType);
-                const alltoken = coinList[chainName];
-                const token = alltoken.find(token => token.name === currentCoin.name);
-                if(!token){
-                    console.error('unsupport coin from list')
-                    return;
                 }
-                const sendToken = web3.utils.toWei(amount, token.decimals);
-                response = await createUserOpERC20Tx(web3, address, rawId, publicKeys, token.address, toAddress,  parseFloat(sendToken) || 0, feeAsset);
-                console.log(response);
-            }
+                else{
+                    console.log('ERC20 userOp generation......... fee', feeType);
+                    const alltoken = coinList[chainName];
+                    const token = alltoken.find(token => token.name === currentCoin.name);
+                    if(!token){
+                        console.error('unsupport coin from list')
+                        return;
+                    }
+                    const sendToken = web3.utils.toWei(amount, token.decimals);
+                    response = await createUserOpERC20Tx(web3, address, rawId, publicKeys, token.address, toAddress,  parseFloat(sendToken) || 0, feeAsset);
+                    console.log(response);
+                }
 
-            if(!response.error)
-            {
-                setAproxFee(response?.requiredFee);
-                setUserOp(response?.userOp);
-                console.log((Number(amount) + Number(response?.requiredFee)), balance)
-                if(currentCoin?.name === feeAsset.name){
-                    if(balance && ((Number(amount) + Number(response?.requiredFee)) <= balance))
-                        setIsBalanceOk(true);
+                if(!response.error)
+                {
+                    setAproxFee(response?.requiredFee);
+                    setUserOp(response?.userOp);
+                    console.log((Number(amount) + Number(response?.requiredFee)), balance)
+                    if(currentCoin?.name === feeAsset.name){
+                        if(balance && ((Number(amount) + Number(response?.requiredFee)) <= balance))
+                            setIsBalanceOk(true);
+                    }else{
+                        if(balance && (Number(amount)) <= balance)
+                            setIsBalanceOk(true);
+                    }
+                    setLoading(false);
                 }else{
-                    if(balance && (Number(amount)) <= balance)
-                        setIsBalanceOk(true);
+                    setAproxFee('');
+                    setUserOp(undefined);
+                    handleError(response.message);
+                    setIsNext(false);
                 }
-                setLoading(false);
-            }else{
-                setAproxFee('');
-                setUserOp(undefined);
+            } catch (err: any) {
+                console.error('Error in getUserOperation:', err);
+                handleError(err.message);
+                setIsNext(false);
             }
         }
 
@@ -172,111 +220,135 @@ export default function Send(props: any) {
     const onConfirm = async () => {
         if(!userOp)
             return;
-
-        const response = await signAndSubmitUserOp(web3, rawId, userOp);
-        console.log(response);
-        if (!response.error) {
-            console.log('getUserOperationByHash function calling ...');
-            for (let i = 0; true; i++) {
-                const res = await getUserOperationByHash(web3, response.opHash);
-                const result = res.result;
-                if (!(result === null) && result.status) {
-                    console.log('Transaction status: ', result.status, result.transaction);
-
-                    if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
-                        if (result.status === 'Cancelled' || result.status === 'Reverted') {
-                            // handleError(`Transaction is ${result.status}. Try again later`);
-                        } else {
-                            console.log('Transaction completed successfully.');
+        try {
+            const response = await signAndSubmitUserOp(web3, rawId, userOp);
+            console.log(response);
+            if (!response.error) {
+                console.log('getUserOperationByHash function calling ...');
+                for (let i = 0; true; i++) {
+                    const res = await getUserOperationByHash(web3, response.opHash);
+                    const result = res.result;
+                    if (!(result === null) && result.status) {
+                        console.log('Transaction status: ', result.status, result.transaction);
+                        setTxStatus(result.status);
+                        setTxHash(result.transaction);
+                        if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
+                            if (result.status === 'Cancelled' || result.status === 'Reverted') {
+                                // handleError(`Transaction is ${result.status}. Try again later`);
+                            } else {
+                                console.log('Transaction completed successfully.');
+                            }
+                            // await handleAddTransaction(result.status, result);
+                            break;
                         }
-                        // await handleAddTransaction(result.status, result);
-                        break;
                     }
+
+                    // Wait for a specified delay before retrying
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
-
-                // Wait for a specified delay before retrying
-                await new Promise(resolve => setTimeout(resolve, 3000));
+            }else{
+                console.log(response.message);
+                handleError(response.message);
             }
-        }else{
-            console.error(response.message);
+        } catch (err: any) {
+            console.error('Error in sendTx:', err);
+            handleError(err.message);
         }
-
         isSend(false);
-
     }
 
     return (
-        <div>
-            {/* Header */}
-            <div style={header}>
-                {isNext ? (
-                    <span style={arrow} onClick={handleCloseTransfer}>×</span>
-                ) : (
-                    <span style={arrow} onClick={() => isSend(false)}>‹</span>
-                )}
-                <h2 style={title}>Transfer</h2>
-            </div>
-
-            {/* Transfer Section */}
-            {isNext ? (
-                <div>
-                    <div style={amountSection}>
-                        <h3>-{amount} {currentCoin?.symbol}</h3>
-                    </div>
-
-                    {/* Transfer Details */}
-                    <div style={detailSection}>
-                        <DetailRow label="Asset" value={currentCoin?.symbol} />
-                        <DetailRow label="Wallet" address={address} />
-                        <DetailRow label="To" address={toAddress} bold />
-                        <DetailRow
-                            label="Gas Token(aprox)"
-                            selectOptions={feeTokenOptions}
-                            selectedValue={feeType}
-                            onChange={handleChainChange}
-                        />
-                        <DetailRow label="Network Fee" value={aproxFee +" "+ feeAsset?.symbol}/>
-                    </div>
-
-                    {/* Confirm Button */}
-                    <button style={confirmButton}  disabled={!(aproxFee && userOp && isBalanceOk)} onClick={onConfirm}>Confirm</button>
-                </div>
+        <>
+            {loading ? (
+                <Loading />
             ) : (
-                <div style={transferContainer}>
-                    <form style={addressContainer}>
-                        <div style={inputFormField}>
-                            <input
-                                style={inputField}
-                                type="text"
-                                value={toAddress}
-                                onChange={(e) => setToAddress(e.target.value)}
-                                placeholder="Address or Domain Name"
-                            />
-                            {!isValidAddress && <p style={errorTextStyle}>Invalid address.</p>}
+                <div>
+                    {/* Header */}
+                    <div style={header}>
+                        {isNext ? (
+                            <span style={arrow} onClick={handleCloseTransfer}>×</span>
+                        ) : (
+                            <span style={arrow} onClick={() => isSend(false)}>‹</span>
+                        )}
+                        <h2 style={title}>Transfer</h2>
+                    </div>
+    
+                    {/* Transfer Section */}
+                    {isNext ? (
+                        <div>
+                            <div style={amountSection}>
+                                <h3>-{amount} {currentCoin?.symbol}</h3>
+                            </div>
+    
+                            {/* Transfer Details */}
+                            <div style={detailSection}>
+                                <DetailRow label="Asset" value={currentCoin?.symbol} />
+                                <DetailRow label="Wallet" address={address} />
+                                <DetailRow label="To" address={toAddress} bold />
+                                <DetailRow
+                                    label="Gas Token(aprox)"
+                                    selectOptions={feeTokenOptions}
+                                    selectedValue={feeType}
+                                    onChange={handleChainChange}
+                                />
+                                <DetailRow label="Network Fee" value={aproxFee + " " + feeAsset?.symbol} />
+                            </div>
+    
+                            {/* Confirm Button */}
+                            <button style={confirmButton} disabled={!(aproxFee && userOp && isBalanceOk)} onClick={onConfirm}>
+                                Confirm
+                            </button>
                         </div>
-
-                        <div style={inputFormField}>
-                            <input
-                                style={inputField}
-                                type="number"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                placeholder={`${currentCoin?.name} Amount`}
-                            />
-                            {!isValidAmount && <p style={errorTextStyle}>Invalid amount.</p>}
+                    ) : (
+                        <div style={transferContainer}>
+                            <form style={addressContainer}>
+                                <div style={inputFormField}>
+                                    <input
+                                        style={inputField}
+                                        type="text"
+                                        value={toAddress}
+                                        onChange={(e) => setToAddress(e.target.value)}
+                                        placeholder="Address or Domain Name"
+                                    />
+                                    {!isValidAddress && <p style={errorTextStyle}>Invalid address.</p>}
+                                </div>
+    
+                                <div style={inputFormField}>
+                                    <input
+                                        style={inputField}
+                                        type="number"
+                                        value={amount}
+                                        onChange={(e) => setAmount(e.target.value)}
+                                        placeholder={`${currentCoin?.name} Amount`}
+                                    />
+                                    {!isValidAmount && <p style={errorTextStyle}>Invalid amount.</p>}
+                                </div>
+                                <p>Available: {balance}</p>
+                                <button
+                                    style={{ ...submitButton, backgroundColor: (toAddress && amount) ? '#8b6b99' : '#cfcad2' }}
+                                    disabled={!(toAddress && amount)}
+                                    onClick={(e) => { e.preventDefault(); handleNext(); }}>
+                                    Next
+                                </button>
+                            </form>
                         </div>
-                        <p>Available: {balance}</p>
-                        <button
-                            style={{ ...submitButton, backgroundColor: (toAddress && amount) ? '#8b6b99' : '#cfcad2' }}
-                            disabled={!(toAddress && amount)}
-                            onClick={(e) => { e.preventDefault(); handleNext(); }}>
-                            Next
-                        </button>
-                    </form>
+                    )}
+                    <TransactionPopup
+                        show={showPopup}
+                        txStatus={txStatus}
+                        txHash={txHash}
+                        onClose={handleClosePopup}
+                    />
+                    <ErrorPopup
+                    show={showErrorPopup}
+                    message={errorMessage}
+                    onClose={handleClosePopup}
+                    />
                 </div>
             )}
-        </div>
+        </>
     );
+    
 }
 
 // Helper Component for Displaying Details

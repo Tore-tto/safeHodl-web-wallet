@@ -53,7 +53,7 @@ export default function Transfer(props: any) {
           setTransactions(allTransactions);
         };
         fetchTransactions();
-      }, []);
+      }, [isSend]);
 
     //Calculating estimate address
     useEffect(() => {

@@ -9,6 +9,7 @@ import { HexString } from "web3";
 import Loading from "./popups/Loading";
 import TransactionPopup from "./popups/TransactionPopup";
 import ErrorPopup from "./popups/ErrorPupUp";
+import { saveTransaction } from "./database/indexDb";
 
 export default function Send(props: any) {
     const {web3, rawId, publicKeys, address,currentCoin, isSend } = props;
@@ -89,6 +90,20 @@ export default function Send(props: any) {
         }
     }, [txStatus, errorMessage]);
 
+    const handleAddTransaction = async(status:String, result:any) =>{
+        // console.log({status},{result});
+        const transaction = {
+            hash:result.transaction,
+            from:result.userOp.sender,
+            to: toAddress,
+            amount: amount,
+            type: currentCoin.name, // E.g., "deposit", "withdrawal"
+            status:status
+        };
+        console.log("db transaction",transaction);
+        await saveTransaction(rawId, transaction);
+    }
+
     // Handle Loading
     const stopLoading = () => {
         setLoading(false);
@@ -103,6 +118,7 @@ export default function Send(props: any) {
         setErrorMessage('');
         setTxStatus('');
         setTxHash('');
+        isSend(false);
     };
 
     // Handle errors
@@ -238,7 +254,7 @@ export default function Send(props: any) {
                             } else {
                                 console.log('Transaction completed successfully.');
                             }
-                            // await handleAddTransaction(result.status, result);
+                            await handleAddTransaction(result.status, result);
                             break;
                         }
                     }
@@ -254,7 +270,6 @@ export default function Send(props: any) {
             console.error('Error in sendTx:', err);
             handleError(err.message);
         }
-        isSend(false);
     }
 
     return (

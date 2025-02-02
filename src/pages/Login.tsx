@@ -3,11 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 import { startAuthentication } from "@simplewebauthn/browser";
 
-import elliptic from "elliptic";
 import { v4 as uuidv4 } from "uuid";
 
-const EC = elliptic.ec;
-const ec = new EC("p256");
 
 
 function Login() {

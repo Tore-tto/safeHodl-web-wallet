@@ -1,17 +1,17 @@
 import { ethers, BigNumber } from "ethers";
-import LouiceFactory from "../abi/LouiceFactory.json";
+import SafeHodlFactory from "../abi/SafeHodlFactory.json";
 import { HexString } from "web3";
 
 import {coinList} from '../token/coinList';
-import {chainIdandType,chainInfo, SECP256R1_VERIFIER, SALT, LOUICE_FACTORY} from "./chainInfo"
+import {chainIdandType,chainInfo, SECP256R1_VERIFIER, SALT, SafeHodl_FACTORY} from "./chainInfo"
 
 export const getEstimateAddress = async (web3:any, rawId: any, publicKeys:any[]): Promise<any> => {
-    const LouiceFactoryIn = new web3.eth.Contract(LouiceFactory.abi, LOUICE_FACTORY);
+    const SafeHodlFactoryIn = new web3.eth.Contract(SafeHodlFactory.abi, SafeHodl_FACTORY);
     
     const prefix = "0x04";
     const publicKey = prefix +publicKeys[0].slice(2) + publicKeys[1].slice(2);
     
-    const address = LouiceFactoryIn.methods.getAddress(
+    const address = SafeHodlFactoryIn.methods.getAddress(
       SECP256R1_VERIFIER,
       publicKey,
       SALT).call();

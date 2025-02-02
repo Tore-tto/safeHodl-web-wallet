@@ -4,7 +4,7 @@ export default function Header() {
     const navigate = useNavigate();
     return (
       <h1 className="App-header" onClick={() => navigate('/')}>
-        Louice Wallet
+        SafeHodl Wallet
       </h1>
     );
   }

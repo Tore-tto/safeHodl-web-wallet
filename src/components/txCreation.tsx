@@ -8,7 +8,7 @@ import {
     SALT,
     ENTRYPOINT,
     SECP256R1_VERIFIER,
-    LOUICE_FACTORY
+    SafeHodl_FACTORY
 } from './chainInfo';
 
 import {fetchERC20Balance} from './estimateAddress';
@@ -222,7 +222,7 @@ const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, pub
 
         const encodedFunctionCall = web3.eth.abi.encodeFunctionCall(TransactionAbi.createAccountABI, [SECP256R1_VERIFIER ,publicKey, SALT]);
 
-        var initCode = LOUICE_FACTORY + encodedFunctionCall.slice(2);
+        var initCode = SafeHodl_FACTORY + encodedFunctionCall.slice(2);
         console.log({initCode});
         const sender = await getSenderAddress(entryContract, initCode);
         console.log({ sender });

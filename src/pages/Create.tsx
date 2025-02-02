@@ -99,7 +99,7 @@ function Create() {
     
     const obj = {
       rp: {
-        name: 'LouiceWallet/passkey-login',
+        name: 'SafeHodlWallet/passkey-login',
         id: window.location.hostname,
       },
       user: {

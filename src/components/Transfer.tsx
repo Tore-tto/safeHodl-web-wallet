@@ -129,7 +129,7 @@ export default function Transfer(props: any) {
                     </div>
                     <div style={history}>
                         <p>History</p>
-                        <TransactionHistory transactions={transactions}></TransactionHistory>
+                        <TransactionHistory transactions={transactions} currentCoinType={currentCoin.name}></TransactionHistory>
                         </div>
                 </div>
             )}

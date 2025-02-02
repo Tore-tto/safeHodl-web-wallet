@@ -13,6 +13,7 @@ import { saveTransaction } from "./database/indexDb";
 
 export default function Send(props: any) {
     const {web3, rawId, publicKeys, address,currentCoin, isSend } = props;
+    console.log("current coin name",{currentCoin});
     const balance = useContext(Web3Context);
 
     //current network
@@ -91,7 +92,7 @@ export default function Send(props: any) {
     }, [txStatus, errorMessage]);
 
     const handleAddTransaction = async(status:String, result:any) =>{
-        // console.log({status},{result});
+        console.log("current coin name",{currentCoin});
         const transaction = {
             hash:result.transaction,
             from:result.userOp.sender,

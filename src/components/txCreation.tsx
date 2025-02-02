@@ -114,7 +114,7 @@ const sendUserOperation = async (web3:any, userOp:any) => {
     return opHash;
 };
 
-export const getUserOperationByHash = async (web3:any, opHash:HexString, delay = 3000) => {
+export const getUserOperationByHash = async (web3:any, opHash:HexString) => {
 
     const response = await web3.currentProvider.sendAsync({
         jsonrpc: "2.0",
@@ -213,7 +213,7 @@ export const signAndSubmitUserOp = async(web3:any, rawId:string, userOp:UserOper
     return { error: false, message: "", opHash:OpHash.result};
 }
 
-const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeAsset:TokenKey) => {
+const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[], callData:any, executeParams:any[], paymasterAndData:any, feeAsset:TokenKey) => {
     console.log('createTx function calling...');
     const {userOpProvider, PAYMASTER_ADDRESS, entryContract} = await getChainDetails(web3);
     try {
@@ -321,7 +321,7 @@ const createUserOp = async (web3:any, walletAddress:HexString, rawId:string, pub
     }
 };
 
-export const createUserOpETHTx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], receiverAddress:HexString, amount:number, feeAsset: { name: string; symbol: string; type: string; decimals: number; address: string }) => {
+export const createUserOpETHTx = async (web3:any, walletAddress:HexString, publicKeys:any[], receiverAddress:HexString, amount:number, feeAsset: { name: string; symbol: string; type: string; decimals: number; address: string }) => {
     var callData;
     var executeParams;
     var paymasterAndData;
@@ -344,10 +344,10 @@ export const createUserOpETHTx = async (web3:any, walletAddress:HexString, rawId
     }
         
 
-    return createUserOp(web3, walletAddress, rawId, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
+    return createUserOp(web3, walletAddress, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
 };
 
-export const createUserOpERC20Tx = async (web3:any, walletAddress:HexString, rawId:string, publicKeys:any[], contractAddress:HexString, receiverAddress:HexString, tokenAmount:number, feeAsset:TokenKey) => {
+export const createUserOpERC20Tx = async (web3:any, walletAddress:HexString, publicKeys:any[], contractAddress:HexString, receiverAddress:HexString, tokenAmount:number, feeAsset:TokenKey) => {
     const data = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Transfer, [receiverAddress,tokenAmount]);
     var callData;
     var executeParams;
@@ -369,5 +369,5 @@ export const createUserOpERC20Tx = async (web3:any, walletAddress:HexString, raw
         executeParams = [contractAddress, 0, data, ERC20_contract, approveData];
         paymasterAndData = PAYMASTER_ADDRESS + "F756Dd3123b69795d43cB6b58556b3c6786eAc13010000671a219600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013b5e557e4601a264c654f3f0235ed381fc08b5ffea980e403bc807e27433586b0eb1abe122723125fc4d62ef605943f53a0c87893af3cfd6d33c3924cb0a4328ab0da981c";
     }
-    return createUserOp(web3, walletAddress,rawId, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
+    return createUserOp(web3, walletAddress, publicKeys, callData, executeParams, paymasterAndData, feeAsset);
 }

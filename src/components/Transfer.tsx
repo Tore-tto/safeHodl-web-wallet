@@ -17,7 +17,8 @@ import discover from '../assets/discover.png';
 import downArrow from '../assets/downarrow.png';
 import upArrow from '../assets/uparrow.png';
 import TransactionHistory from './TransactionHistory';
-import {getAllTransactions, saveTransaction, clearTransactions} from './database/indexDb'
+import {getAllTransactions} from './database/indexDb'
+import Loading from './popups/Loading';
 export default function Transfer(props: any) {
     const { currentCoin, handleBackClick, userInfo } = props;
     const { name, rawId, publicKeys } = userInfo || {}; // Safely destructure userInfo
@@ -29,6 +30,9 @@ export default function Transfer(props: any) {
     const [isReceive, setIsReceive] = useState<boolean>(false);
     const [transactions, setTransactions] = useState([] as any);
 
+    //Loading..
+    const [loading, setLoading] = useState<boolean>(true); 
+    
     console.log('chainType:', currentCoin?.chain);
 
     function getBundelerURL(hexChainID: keyof typeof chainIdandType) {
@@ -62,7 +66,7 @@ export default function Transfer(props: any) {
 
         const fetchContractAddress = async () => {
             try {
-                const estimateAddress = await getEstimateAddress(web3, rawId, publicKeys);
+                const estimateAddress = await getEstimateAddress(web3, publicKeys);
                 setAddress(estimateAddress);
             } catch (error) {
                 console.error('Error fetching contract address:', error);
@@ -86,7 +90,7 @@ export default function Transfer(props: any) {
         };
 
         balance(address);  // Fetch conBalance immediately on address change
-
+        setLoading(false);
         // Start the interval to fetch conBalance every 5 seconds
         const intervalId = setInterval(() => {
             balance(address);
@@ -127,10 +131,12 @@ export default function Transfer(props: any) {
                             <p>Receive</p>
                         </div>
                     </div>
-                    <div style={history}>
-                        <p>History</p>
-                        <TransactionHistory transactions={transactions} currentCoinType={currentCoin.name}></TransactionHistory>
-                        </div>
+                    {loading? <Loading /> : (
+                        <div style={history}>
+                            <p>History</p>
+                            <TransactionHistory transactions={transactions} currentCoinType={currentCoin.name}></TransactionHistory>
+                        </div>)
+                    }
                 </div>
             )}
             <Web3Context.Provider value={balance}>

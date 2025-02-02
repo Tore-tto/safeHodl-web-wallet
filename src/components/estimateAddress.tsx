@@ -1,11 +1,10 @@
-import { ethers, BigNumber } from "ethers";
 import SafeHodlFactory from "../abi/SafeHodlFactory.json";
 import { HexString } from "web3";
 
 import {coinList} from '../token/coinList';
 import {chainIdandType,chainInfo, SECP256R1_VERIFIER, SALT, SafeHodl_FACTORY} from "./chainInfo"
 
-export const getEstimateAddress = async (web3:any, rawId: any, publicKeys:any[]): Promise<any> => {
+export const getEstimateAddress = async (web3:any, publicKeys:any[]): Promise<any> => {
     const SafeHodlFactoryIn = new web3.eth.Contract(SafeHodlFactory.abi, SafeHodl_FACTORY);
     
     const prefix = "0x04";

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 function TransactionHistory(props: { transactions: any[]; currentCoinType: any }) {
   const [expandedId, setExpandedId] = useState<string>("");

@@ -1,29 +1,17 @@
-import React, { useState, useEffect } from "react";
 import {
-    browserSupportsWebAuthn,
-    browserSupportsWebAuthnAutofill,
-    platformAuthenticatorIsAvailable,
     startAuthentication,
-    startRegistration,
 } from "@simplewebauthn/browser";
 // @ts-ignore
 import elliptic from "elliptic";
 import base64url from "base64url";
-import { v4 as uuidv4 } from "uuid";
 import { AsnParser } from "@peculiar/asn1-schema";
 import { ECDSASigValue } from "@peculiar/asn1-ecc";
 import { utils } from "@passwordless-id/webauthn";
-import * as cbor from "../utils/cbor";
 import {
-    parseAuthData,
-    publicKeyCredentialToJSON,
     shouldRemoveLeadingZero,
 } from "../utils/helpers";
-import entryPointAbi from "../abi/entrypoint.json";
 import { ethers, BigNumber } from "ethers";
 import { HexString } from "web3";
-const EC = elliptic.ec;
-const ec = new EC("p256");
 
 const getMessageSignature = (authResponseSignature: string): BigNumber[] => {
     // See https://github.dev/MasterKale/SimpleWebAuthn/blob/master/packages/server/src/helpers/iso/isoCrypto/verifyEC2.ts

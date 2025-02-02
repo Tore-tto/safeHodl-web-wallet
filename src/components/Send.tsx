@@ -144,7 +144,7 @@ export default function Send(props: any) {
                 if (currentCoin?.type === 'COIN') {
                     console.log('Native coin userOp generation......... fee', feeType);
                     const sendAmount = web3.utils.toWei(amount, 'ether');
-                    response = await createUserOpETHTx(web3, address, rawId, publicKeys, toAddress, parseFloat(sendAmount) || 0, feeAsset);
+                    response = await createUserOpETHTx(web3, address, publicKeys, toAddress, parseFloat(sendAmount) || 0, feeAsset);
                     console.log(response);
 
                 }
@@ -157,7 +157,7 @@ export default function Send(props: any) {
                         return;
                     }
                     const sendToken = web3.utils.toWei(amount, token.decimals);
-                    response = await createUserOpERC20Tx(web3, address, rawId, publicKeys, token.address, toAddress,  parseFloat(sendToken) || 0, feeAsset);
+                    response = await createUserOpERC20Tx(web3, address, publicKeys, token.address, toAddress,  parseFloat(sendToken) || 0, feeAsset);
                     console.log(response);
                 }
 

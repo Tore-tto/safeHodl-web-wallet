@@ -18,7 +18,7 @@ export const feeTokens: Record<string, { name: string; symbol: string; type: str
     Amoy: [
         {
             name: 'Amoy',
-            symbol: 'POL',
+            symbol: 'MATIC',
             type: 'COIN',
             decimals: 18,
             address: ''

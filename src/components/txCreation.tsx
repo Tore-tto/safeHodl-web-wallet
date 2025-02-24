@@ -11,7 +11,7 @@ import {
     SafeHodl_FACTORY
 } from './chainInfo';
 
-import {fetchERC20Balance} from './estimateAddress';
+import {fetchERC20Balance,fetchBalance} from './estimateAddress';
 import signUserOperation from './signTx';
 
 import Entrypoint from '../abi/entrypoint.json';
@@ -309,9 +309,13 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
                 }
                     userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData.result;    
         }else{
+            const balance = await fetchBalance(web3,walletAddress);
             const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
             console.log({totalGas});
             requiredFee = Number(totalGas * window.BigInt(maxFeePerGas))/10 ** 18;
+            if (balance < requiredFee){
+                alert(`Insufficient balance. need : ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}`)
+            }
             console.log({requiredFee});
         }
         return { error: false, message: "", userOp:userOp, requiredFee:requiredFee.toString()};

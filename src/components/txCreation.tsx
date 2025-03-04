@@ -276,6 +276,11 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
         console.log({maxPriorityFeePerGas});
         userOp.maxPriorityFeePerGas = maxPriorityFeePerGas; //temporarily
 
+        const _dest = executeParams[0]
+        const encodedData = executeParams[2];
+        const approvedToken = executeParams[3]
+        const decoded = web3.eth.abi.decodeParameters(TransactionAbi.ERC20Transfer.inputs, encodedData.slice(10));
+        const tokenAmount = Number(decoded.amount) / 10 ** feeAsset.decimals;
         let requiredFee = 0;
         if(!(paymasterAndData === "0x")){
                 console.log("Paymaster and data provided");
@@ -292,9 +297,12 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
                 const chainID = await web3.eth.getChainId();
                 const hexChainID = `0x${chainID.toString(16)}` as keyof typeof chainIdandType;
                 const balance =  await fetchERC20Balance(web3, walletAddress,hexChainID, feeAsset.name);
-                if(requiredFee > balance)
-                return { error: true, message: `Insufficient balance. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}`};
-    
+                if(requiredFee > balance){
+                    return { error: true, message: `Insufficient balance. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}`};
+                }else if((_dest === approvedToken)){
+                    if((requiredFee + tokenAmount) > balance)
+                        return { error: true, message: `Insufficient balance. need ${(requiredFee + tokenAmount)} ${feeAsset.symbol} available ${balance}`};
+                }
                 const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
                 userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
                 const paymasterData = await getSponserFromPaymaster(web3,userOp, executeParams[3]);
@@ -304,6 +312,8 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
                     if (paymasterData.error.code === 3) {
                         return {error: true,message:errorMessage = `${paymasterData.error?.message}. Need ${requiredFee} ${feeAsset.symbol}, available ${balance}`};
                     } else if (paymasterData.error.code === 2) {
+                        return {error: true,message:errorMessage += ` ${paymasterData.error?.message || ""}`};
+                    }else if (paymasterData.error.code === 101) {
                         return {error: true,message:errorMessage += ` ${paymasterData.error?.message || ""}`};
                     }
                 }

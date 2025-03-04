@@ -121,8 +121,11 @@ export default function Send(props: any) {
         setErrorMessage('');
         setTxStatus('');
         setTxHash('');
-        if(!(errorMessage==="AA21 didn't pay prefund"))
+        const ignoredErrors = ["AA21 didn't pay prefund", "Insufficient balance."];
+        const shouldIgnore = ignoredErrors.some(err => errorMessage.toString().includes(err));
+        if (!shouldIgnore) {
             isSend(false);
+        }
     };
 
     // Handle errors

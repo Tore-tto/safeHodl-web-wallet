@@ -118,7 +118,7 @@ export const getUserOperationByHash = async (web3:any, opHash:HexString) => {
 
     const response = await web3.currentProvider.sendAsync({
         jsonrpc: "2.0",
-        method: "skandha_userOperationStatus",
+        method: "safehodl_userOperationStatus",
         params: [opHash],
         id: new Date().getTime()
     });
@@ -272,15 +272,12 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
         userOp.callGasLimit = callGasLimit;
 
         userOp.maxFeePerGas = maxFeePerGas;
-        const {maxPriorityFeePerGas} = await userOpProvider.send("skandha_getGasPrice",[]);
-        console.log({maxPriorityFeePerGas});
+        const {maxPriorityFeePerGas} = await userOpProvider.send("safehodl_getGasPrice",[]);
         userOp.maxPriorityFeePerGas = maxPriorityFeePerGas; //temporarily
 
         const _dest = executeParams[0]
         const encodedData = executeParams[2];
         const approvedToken = executeParams[3]
-        const decoded = web3.eth.abi.decodeParameters(TransactionAbi.ERC20Transfer.inputs, encodedData.slice(10));
-        const tokenAmount = Number(decoded.amount) / 10 ** feeAsset.decimals;
         let requiredFee = 0;
         if(!(paymasterAndData === "0x")){
                 console.log("Paymaster and data provided");
@@ -300,6 +297,8 @@ const createUserOp = async (web3:any, walletAddress:HexString, publicKeys:any[],
                 if(requiredFee > balance){
                     return { error: true, message: `Insufficient balance. need ${requiredFee} ${feeAsset.symbol} available ${balance} ${feeAsset.symbol}`};
                 }else if((_dest === approvedToken)){
+                    const decoded = web3.eth.abi.decodeParameters(TransactionAbi.ERC20Transfer.inputs, encodedData.slice(10));
+                    const tokenAmount = Number(decoded.amount) / 10 ** feeAsset.decimals;
                     if((requiredFee + tokenAmount) > balance)
                         return { error: true, message: `Insufficient balance. need ${(requiredFee + tokenAmount)} ${feeAsset.symbol} available ${balance}`};
                 }

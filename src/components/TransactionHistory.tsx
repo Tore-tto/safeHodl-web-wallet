@@ -22,7 +22,7 @@ function TransactionHistory(props: { currentCoinType: string; walletAddress: any
     } else if (chainName === 'Sepolia'){
       return {
         url: `https://eth-sepolia.g.alchemy.com/v2/${API_KEY}`,
-        category: ["external", "erc20", "internal"]
+        category: ["external", "erc20"]
       };
     }
     return undefined;
